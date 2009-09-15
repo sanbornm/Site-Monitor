@@ -50,9 +50,9 @@ def load_old_results(file_path):
 		picklefile.close()
 	return pickledata
 	
-def store_results(file_path):
+def store_results(file_path, data):
 	output = open(file_path,'wb')
-        pickle.dump(pickledata, output)
+        pickle.dump(data, output)
         output.close()
 	
 def main(*args):
@@ -83,7 +83,7 @@ def main(*args):
 		logging.error('Either the world ended or we are not connected to the net.')
 		
 	# Store results in pickle file
-	store_results(pickle_file)
+	store_results(pickle_file, pickledata)
 
 if __name__ == '__main__':
 	main(sys.argv)
