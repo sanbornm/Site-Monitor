@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-# Sample usage: checksites.py eriwen.com nixtutor.com ... etc.
+# sample usage: checksites.py eriwen.com nixtutor.com yoursite.org
 
 import pickle, os, sys, logging
 from httplib import HTTPConnection, socket
@@ -8,7 +8,7 @@ from smtplib import SMTP
 
 def email_alert(message, status):
     fromaddr = 'you@gmail.com'
-    toaddrs = '5551234567@txt.att.net'
+    toaddrs = 'yourphone@txt.att.net'
     
     server = SMTP('smtp.gmail.com:587')
     server.starttls()
@@ -17,9 +17,13 @@ def email_alert(message, status):
     server.quit()
 
 def get_site_status(url):
-    if get_response(url).status != 200:
-        return 'down'
-    return 'up'
+    response = get_response(url)
+    try:
+        if getattr(response, 'status') == 200:
+            return 'up'
+    except AttributeError:
+    	pass
+    return 'down'
         
 def get_response(url):
     '''Return response object from URL'''
@@ -28,35 +32,37 @@ def get_response(url):
         conn.request('HEAD', '/')
         return conn.getresponse()
     except socket.error:
-    	def headers_unavailable():
-    	    return 'Headers unavailable'
-    	# Server is up but connection refused
-    	return ['status': 403, 'getheaders': headers_unavailable]
+    	return None
     except:
         logging.error('Bad URL:', url)
         exit(1)
         
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
-    return get_response(url).getheaders()
+    response = get_response(url)
+    try:
+        return getattr(response, 'getheaders')()
+    except AttributeError:
+    	return 'Headers unavailable'
 
 def compare_site_status(prev_results):
     '''Report changed status based on previous results'''
     
     def is_status_changed(url):
     	status = get_site_status(url)
-    	print '%s is %s' % (url, status)
+    	friendly_status = '%s is %s' % (url, status)
+    	print friendly_status
     	if url in prev_results and prev_results[url] != status:
             logging.warning(status)
             # Email status messages
-            email_alert(str(get_headers(url)), status)
+            email_alert(str(get_headers(url)), friendly_status)
         prev_results[url] = status
 
-    return compare_site_status
+    return is_status_changed
 
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
-    if not is_url_reachable('www.google.com') and not is_url_reachable('www.yahoo.com'):
+    if get_site_status('www.google.com') == 'down' and get_site_status('www.yahoo.com') == 'down':
         return False
     return True
     
