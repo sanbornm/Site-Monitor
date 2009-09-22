@@ -6,44 +6,53 @@ import pickle, os, sys, logging
 from httplib import HTTPConnection, socket
 from smtplib import SMTP
 
-def email_alert(message, subject='You have an alert'):
-    fromaddr = 'user@gmail.com'
+def email_alert(message, status):
+    fromaddr = 'you@gmail.com'
     toaddrs = '5551234567@txt.att.net'
     
     server = SMTP('smtp.gmail.com:587')
     server.starttls()
-    # I encourage you to get this from somewhere more secure
-    server.login('gmailuser', 'password')
-    server.sendmail(fromaddr, toaddrs, message)
+    server.login('you', 'password')
+    server.sendmail(fromaddr, toaddrs, 'Subject: %s\r\n%s' % (status, message))
     server.quit()
 
-def is_url_reachable(url):
-    '''Make HEAD request to url'''
+def get_site_status(url):
+    if get_response(url).status != 200:
+        return 'down'
+    return 'up'
+        
+def get_response(url):
+    '''Return response object from URL'''
     try:
         conn = HTTPConnection(url)
-        conn.request("HEAD", "/")
-        if conn.getresponse().status != 200:
-            return False
-        return True
+        conn.request('HEAD', '/')
+        return conn.getresponse()
     except socket.error:
+    	def headers_unavailable():
+    	    return 'Headers unavailable'
     	# Server is up but connection refused
-    	return False
+    	return ['status': 403, 'getheaders': headers_unavailable]
     except:
         logging.error('Bad URL:', url)
-        raise
+        exit(1)
         
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
-    try:
-        conn = HTTPConnection(url)
-        conn.request("HEAD", "/")
-        response = conn.getresponse()
-        return response.getheaders()
-    except socket.error:
-    	return 'Headers unavailable'
-    except: 
-        logging.error('Bad URL:', url)
-        raise
+    return get_response(url).getheaders()
+
+def compare_site_status(prev_results):
+    '''Report changed status based on previous results'''
+    
+    def is_status_changed(url):
+    	status = get_site_status(url)
+    	print '%s is %s' % (url, status)
+    	if url in prev_results and prev_results[url] != status:
+            logging.warning(status)
+            # Email status messages
+            email_alert(str(get_headers(url)), status)
+        prev_results[url] = status
+
+    return compare_site_status
 
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
@@ -66,7 +75,7 @@ def store_results(file_path, data):
     pickle.dump(data, output)
     output.close()
     
-def main(args):
+def main(urls):
     # Setup logging to store time
     logging.basicConfig(level=logging.WARNING, filename='checksites.log', 
             format='%(asctime)s %(levelname)s: %(message)s', 
@@ -76,21 +85,10 @@ def main(args):
     pickle_file = 'data.pkl'
     pickledata = load_old_results(pickle_file)
         
-    # Check sites only if Internet available
+    # Check sites only if Internet is_available
     if is_internet_reachable():
-        # First arg is script name, skip it
-        for url in args[1:]:
-            available = is_url_reachable(url)
-            status = '%s is down' % url
-            if available:
-                status = '%s is up' % url
-            # Print status for those just running without automation
-            print status
-            if url in pickledata and pickledata[url] != available:
-                # Email status messages
-                logging.warning(status)
-                email_alert(str(get_headers(url)), status)
-            pickledata[url] = available
+    	status_checker = compare_site_status(pickledata)
+    	map(status_checker, urls)
     else:
         logging.error('Either the world ended or we are not connected to the net.')
         
@@ -98,4 +96,5 @@ def main(args):
     store_results(pickle_file, pickledata)
 
 if __name__ == '__main__':
-    main(sys.argv)
+    # First arg is script name, skip it
+    main(sys.argv[1:])
