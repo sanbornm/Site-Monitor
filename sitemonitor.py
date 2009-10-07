@@ -4,7 +4,7 @@
 
 import pickle, os, sys, logging, time
 from httplib import HTTPConnection, socket
-from optparse import OptionParser
+from optparse import OptionParser, OptionValueError
 from smtplib import SMTP
 
 def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGmail=False, username='', password=''):
@@ -15,8 +15,11 @@ def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGma
         fromaddr = toEmail
 
     if useGmail:
-        server = SMTP('smtp.gmail.com:587')
-        server.starttls()
+        if username and password:
+            server = SMTP('smtp.gmail.com:587')
+            server.starttls()
+        else:
+            raise OptionValueError('You must provide a username and password to use GMail')
     else:
         server = SMTP('localhost')
 
@@ -115,8 +118,7 @@ def get_command_line_options():
     parser.add_option("-r","--alert-on-slow-response", dest="alertResponseTime",
             help="Turn on alerts for response times")
 
-    parser.add_option("-g","--use-gmail", action="store_true",
-            dest="useGmail",
+    parser.add_option("-g","--use-gmail", action="store_true", dest="useGmail",
             help="Send email with Gmail.  Must also specify username and password")
 
     parser.add_option("-u","--smtp-username", dest="smtpUsername",
