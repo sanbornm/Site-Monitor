@@ -13,7 +13,7 @@ def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGma
         fromaddr = fromEmail
     else:
         fromaddr = toEmail
-    
+
     if useGmail:
         server = SMTP('smtp.gmail.com:587')
         server.starttls()
@@ -22,7 +22,7 @@ def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGma
 
     if username != '' and password != '':
         server.login(username, password)
-        
+
     server.sendmail(fromaddr, toaddrs, 'Subject: %s\r\n%s' % (status,message))
     server.quit()
 
@@ -34,7 +34,7 @@ def get_site_status(url):
     except AttributeError:
         pass
     return 'down'
-        
+
 def get_response(url):
     '''Return response object from URL'''
     try:
@@ -46,7 +46,7 @@ def get_response(url):
     except:
         logging.error('Bad URL:', url)
         exit(1)
-        
+
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
     response = get_response(url)
@@ -57,7 +57,7 @@ def get_headers(url):
 
 def compare_site_status(prev_results):
     '''Report changed status based on previous results'''
-    
+
     def is_status_changed(url):
         startTime = time.time()
         status = get_site_status(url)
@@ -81,7 +81,7 @@ def is_internet_reachable():
     if get_site_status('www.google.com') == 'down' and get_site_status('www.yahoo.com') == 'down':
         return False
     return True
-    
+
 def load_old_results(file_path):
     '''Attempts to load most recent results'''
     pickledata = {}
@@ -90,7 +90,7 @@ def load_old_results(file_path):
         pickledata = pickle.load(picklefile)
         picklefile.close()
     return pickledata
-    
+
 def store_results(file_path, data):
     '''Pickles results to compare on next run'''
     output = open(file_path, 'wb')
@@ -98,11 +98,11 @@ def store_results(file_path, data):
     output.close()
 
 def get_urls_from_file(filename):
-    urls = []
-    for line in open(filename,'r').readlines():
-        line = line.rstrip('\n')
-        urls.append(line)
-    return urls
+    try:
+        return open(filename, 'r').read().split('\n')
+    except:
+        logging.error('Unable to read %s' % filename)
+        return []
 
 def get_command_line_options():
     '''Sets up optparse and command line options'''
@@ -133,7 +133,7 @@ def get_command_line_options():
 
     return parser.parse_args()
 
-    
+
 def main():
 
     # Get argument flags and command options
@@ -155,25 +155,25 @@ def main():
     # Change logging from WARNING to INFO when logResponseTime option is set
     # so we can log response times as well as status changes.
     if options.logResponseTime:
-        logging.basicConfig(level=logging.INFO, filename='checksites.log', 
-                format='%(asctime)s %(levelname)s: %(message)s', 
+        logging.basicConfig(level=logging.INFO, filename='checksites.log',
+                format='%(asctime)s %(levelname)s: %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S')
     else:
-        logging.basicConfig(level=logging.WARNING, filename='checksites.log', 
-                format='%(asctime)s %(levelname)s: %(message)s', 
+        logging.basicConfig(level=logging.WARNING, filename='checksites.log',
+                format='%(asctime)s %(levelname)s: %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S')
-    
+
     # Load previous data
     pickle_file = 'data.pkl'
     pickledata = load_old_results(pickle_file)
-        
+
     # Check sites only if Internet is_available
     if is_internet_reachable():
         status_checker = compare_site_status(pickledata)
         map(status_checker, urls)
     else:
         logging.error('Either the world ended or we are not connected to the net.')
-        
+
     # Store results in pickle file
     store_results(pickle_file, pickledata)
 
