@@ -146,6 +146,8 @@ def main():
         print 'Usage:'
         print "\tPlease specify a url like: www.google.com"
         print "\tNote: The http:// is not necessary"
+        print 'More Help:'
+        print "\tFor more help use the --help flag"
 
     # If the -f flag is set we get urls from a file, otherwise we get them from the command line.
     if options.fromFile:
