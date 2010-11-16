@@ -116,7 +116,7 @@ def get_command_line_options():
             dest="logResponseTime",
             help="Turn on logging for response times")
 
-    parser.add_option("-r","--alert-on-slow-response", dest="alertResponseTime",
+    parser.add_option("-r","--alert-on-slow-response", action="store_true",
             help="Turn on alerts for response times")
 
     parser.add_option("-g","--use-gmail", action="store_true", dest="useGmail",
