@@ -2,8 +2,7 @@
 
 # sample usage: checksites.py eriwen.com nixtutor.com yoursite.org
 
-import pickle, os, sys, logging, time
-from httplib import HTTPConnection, socket
+import pickle, os, sys, logging, time, urllib2, re
 from optparse import OptionParser, OptionValueError
 from smtplib import SMTP
 
@@ -30,33 +29,18 @@ def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGma
     server.quit()
 
 def get_site_status(url):
-    response = get_response(url)
     try:
-        status_code = getattr(response, 'status')
+        status_code = urllib2.urlopen(url).code
         if status_code in (200,302):
             return 'up'
-    except AttributeError:
-        pass
-    return 'down'
-
-def get_response(url):
-    '''Return response object from URL'''
-    try:
-        conn = HTTPConnection(url)
-        conn.request('HEAD', '/')
-        return conn.getresponse()
-    except socket.error:
-        return None
     except:
-        logging.error('Bad URL:', url)
-        exit(1)
+        return 'down'
 
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
-    response = get_response(url)
     try:
-        return getattr(response, 'getheaders')()
-    except AttributeError:
+        return urllib2.urlopen(url).info().headers
+    except:
         return 'Headers unavailable'
 
 def compare_site_status(prev_results):
@@ -82,7 +66,7 @@ def compare_site_status(prev_results):
 
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
-    if get_site_status('www.google.com') == 'down' and get_site_status('www.yahoo.com') == 'down':
+    if get_site_status('http://www.google.com') == 'down' and get_site_status('http://www.yahoo.com') == 'down':
         return False
     return True
 
@@ -100,6 +84,13 @@ def store_results(file_path, data):
     output = open(file_path, 'wb')
     pickle.dump(data, output)
     output.close()
+
+
+def normalize_url(url):
+    '''If a url doesn't have a http/https prefix, add http://'''
+    if not re.match('^http[s]?://', url):
+        url = 'http://' + url
+    return url
 
 def get_urls_from_file(filename):
     try:
@@ -154,6 +145,8 @@ def main():
         urls = get_urls_from_file(options.fromFile)
     else:
         urls = args
+
+    urls = map(normalize_url, urls)
 
     # Change logging from WARNING to INFO when logResponseTime option is set
     # so we can log response times as well as status changes.
