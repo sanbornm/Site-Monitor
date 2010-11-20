@@ -34,7 +34,8 @@ def get_site_status(url):
         if status_code in (200,302):
             return 'up'
     except:
-        return 'down'
+        pass
+    return 'down'
 
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
