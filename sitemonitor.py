@@ -5,28 +5,36 @@
 import pickle, os, sys, logging, time, urllib2, re
 from optparse import OptionParser, OptionValueError
 from smtplib import SMTP
+from getpass import getuser
+from socket import gethostname
 
-def email_alert(toEmail, fromEmail, message, subject='You have an alert', useGmail=False, username='', password=''):
-    toaddrs = toEmail
-    if fromEmail != '':
-        fromaddr = fromEmail
-    else:
-        fromaddr = toEmail
+def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
+        username=None, password=None, hostname=None, port=25):
 
-    if useGmail:
+    if not from_addr:
+        from_addr = getuser() + "@" + gethostname()
+
+    if use_gmail:
         if username and password:
-            server = SMTP('smtp.gmail.com:587')
+            server = SMTP('smtp.gmail.com', 587)
             server.starttls()
         else:
             raise OptionValueError('You must provide a username and password to use GMail')
     else:
-        server = SMTP('localhost')
+        if hostname:
+            server = SMTP(hostname, port)
+        else:
+            server = SMTP()
+        server.connect()
 
-    if username != '' and password != '':
+    if username and password:
         server.login(username, password)
 
-    server.sendmail(fromaddr, toaddrs, 'Subject: %s\r\n%s' % (subject,message))
-    server.quit()
+
+    def email_alerter(message, subject='You have an alert'):
+        server.sendmail(from_addr, to_addrs, 'Subject: %s\r\n%s' % (subject,message))
+
+    return email_alerter, server.quit
 
 def get_site_status(url):
     try:
@@ -44,7 +52,7 @@ def get_headers(url):
     except:
         return 'Headers unavailable'
 
-def compare_site_status(prev_results):
+def compare_site_status(prev_results, alerter):
     '''Report changed status based on previous results'''
 
     def is_status_changed(url):
@@ -60,7 +68,7 @@ def compare_site_status(prev_results):
         if url in prev_results and prev_results[url] != status:
             logging.warning(status)
             # Email status messages
-            email_alert(str(get_headers(url)), friendly_status)
+            alerter(str(get_headers(url)), friendly_status)
         prev_results[url] = status
 
     return is_status_changed
@@ -105,25 +113,34 @@ def get_command_line_options():
     usage = "Usage: %prog [options] url"
     parser = OptionParser(usage=usage)
     parser.add_option("-t","--log-response-time", action="store_true",
-            dest="logResponseTime",
+            dest="log_response_time",
             help="Turn on logging for response times")
 
     parser.add_option("-r","--alert-on-slow-response", action="store_true",
             help="Turn on alerts for response times")
 
-    parser.add_option("-g","--use-gmail", action="store_true", dest="useGmail",
+    parser.add_option("-g","--use-gmail", action="store_true", dest="use_gmail",
             help="Send email with Gmail.  Must also specify username and password")
 
-    parser.add_option("-u","--smtp-username", dest="smtpUsername",
+    parser.add_option("--smtp-hostname", dest="smtp_hostname",
+            help="Set the stmp server host.")
+
+    parser.add_option("--smtp-port", dest="smtp_port", type="int",
+            help="Set the smtp server port.")
+
+    parser.add_option("-u","--smtp-username", dest="smtp_username",
             help="Set the smtp username.")
 
-    parser.add_option("-p","--smtp-password", dest="smtpPassword",
+    parser.add_option("-p","--smtp-password", dest="smtp_password",
             help="Set the smtp password.")
 
-    parser.add_option("-e","--from-email", dest="fromEmail",
-            help="Set the from email, defaults to the email you are sending to.")
+    parser.add_option("-s","--from-addr", dest="from_addr",
+            help="Set the from email.")
+    
+    parser.add_option("-d","--to-addrs", dest="to_addrs", action="append",
+            help="List of email addresses to send alerts to.")
 
-    parser.add_option("-f","--from-file", dest="fromFile",
+    parser.add_option("-f","--from-file", dest="from_file",
             help="Import urls from a text file. Separated by newline.")
 
     return parser.parse_args()
@@ -134,7 +151,7 @@ def main():
     (options,args) = get_command_line_options()
 
     # Print out usage if no arguments are present
-    if len(args) == 0 and options.fromFile == None:
+    if len(args) == 0 and options.from_file == None:
         print 'Usage:'
         print "\tPlease specify a url like: www.google.com"
         print "\tNote: The http:// is not necessary"
@@ -142,8 +159,8 @@ def main():
         print "\tFor more help use the --help flag"
 
     # If the -f flag is set we get urls from a file, otherwise we get them from the command line.
-    if options.fromFile:
-        urls = get_urls_from_file(options.fromFile)
+    if options.from_file:
+        urls = get_urls_from_file(options.from_file)
     else:
         urls = args
 
@@ -151,7 +168,7 @@ def main():
 
     # Change logging from WARNING to INFO when logResponseTime option is set
     # so we can log response times as well as status changes.
-    if options.logResponseTime:
+    if options.log_response_time:
         logging.basicConfig(level=logging.INFO, filename='checksites.log',
                 format='%(asctime)s %(levelname)s: %(message)s',
                 datefmt='%Y-%m-%d %H:%M:%S')
@@ -164,9 +181,15 @@ def main():
     pickle_file = 'data.pkl'
     pickledata = load_old_results(pickle_file)
 
+    # create an alerter
+    alerter, quiter = generate_email_alerter(options.to_addrs, from_addr=options.from_addr,
+                          use_gmail=options.use_gmail,
+                          username=options.smtp_username, password=options.smtp_password,
+                          hostname=options.smtp_hostname, port=options.smtp_port)
+
     # Check sites only if Internet is_available
     if is_internet_reachable():
-        status_checker = compare_site_status(pickledata)
+        status_checker = compare_site_status(pickledata, alerter)
         map(status_checker, urls)
     else:
         logging.error('Either the world ended or we are not connected to the net.')
@@ -174,6 +197,9 @@ def main():
     # Store results in pickle file
     store_results(pickle_file, pickledata)
 
+    quiter()
+
 if __name__ == '__main__':
     # First arg is script name, skip it
     main()
+
