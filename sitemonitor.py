@@ -32,7 +32,7 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
 
 
     def email_alerter(message, subject='You have an alert'):
-        server.sendmail(from_addr, to_addrs, 'Subject: %s\r\n%s' % (subject,message))
+        server.sendmail(from_addr, to_addrs, 'Subject: %s\r\n%s' % (subject, message))
 
     return email_alerter, server.quit
 
