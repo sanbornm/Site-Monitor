@@ -103,7 +103,13 @@ def normalize_url(url):
 
 def get_urls_from_file(filename):
     try:
-        return open(filename, 'r').read().split('\n')
+        f = open(filename, 'r')
+        filecontents = f.readlines()
+        results = []
+        for line in filecontents:
+            foo = line.strip('\n')
+            results.append(foo)
+        return results
     except:
         logging.error('Unable to read %s' % filename)
         return []
