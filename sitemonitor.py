@@ -24,13 +24,13 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
         if hostname:
             server = SMTP(hostname, port)
         else:
-            server = SMTP()
+            server = SMTP()            
         server.connect()
-
+    
     if username and password:
         server.login(username, password)
 
-
+        
     def email_alerter(message, subject='You have an alert'):
         server.sendmail(from_addr, to_addrs, 'Subject: %s\r\n%s' % (subject, message))
 
@@ -38,12 +38,13 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
 
 def get_site_status(url):
     try:
-        status_code = urllib2.urlopen(url).code
+        urlfile = urllib2.urlopen(url);
+        status_code = urlfile.code
         if status_code in (200,302):
-            return 'up'
+            return 'up', urlfile
     except:
         pass
-    return 'down'
+    return 'down', None
 
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
@@ -57,7 +58,7 @@ def compare_site_status(prev_results, alerter):
 
     def is_status_changed(url):
         startTime = time.time()
-        status = get_site_status(url)
+        status, urlfile = get_site_status(url)
         endTime = time.time()
         elapsedTime = endTime - startTime
         msg = "%s took %s" % (url,elapsedTime)
@@ -65,17 +66,27 @@ def compare_site_status(prev_results, alerter):
 
         friendly_status = '%s is %s' % (url, status)
         print friendly_status
-        if url in prev_results and prev_results[url] != status:
+        if url in prev_results and prev_results[url]['status'] != status:
             logging.warning(status)
             # Email status messages
             alerter(str(get_headers(url)), friendly_status)
-        prev_results[url] = status
+        
+        # Create dictionary for url if one doesn't exist (first time url was checked)
+        if url not in prev_results:
+            prev_results[url] = {}
+            
+        # Save results for later pickling and utility use
+        prev_results[url]['status'] = status
+        prev_results[url]['headers'] = None if urlfile == None else urlfile.info().headers 
+        prev_results[url]['rtime'] = elapsedTime
 
     return is_status_changed
 
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
-    if get_site_status('http://www.google.com') == 'down' and get_site_status('http://www.yahoo.com') == 'down':
+    statusGoogle, urlfileGoogle = get_site_status('http://www.google.com')
+    statusYahoo, urlfileYahoo = get_site_status('http://www.google.com')
+    if statusGoogle == 'down' and statusYahoo == 'down':
         return False
     return True
 
@@ -155,7 +166,7 @@ def main():
 
     # Get argument flags and command options
     (options,args) = get_command_line_options()
-
+    
     # Print out usage if no arguments are present
     if len(args) == 0 and options.from_file == None:
         print 'Usage:'
@@ -186,7 +197,11 @@ def main():
     # Load previous data
     pickle_file = 'data.pkl'
     pickledata = load_old_results(pickle_file)
-
+        
+    # Add some metadata to pickle
+    pickledata['meta'] = {}    # Intentionally overwrite past metadata
+    pickledata['meta']['lastcheck'] = time.strftime('%Y-%m-%d %H:%M:%S')
+    
     # create an alerter
     alerter, quiter = generate_email_alerter(options.to_addrs, from_addr=options.from_addr,
                           use_gmail=options.use_gmail,
@@ -199,7 +214,7 @@ def main():
         map(status_checker, urls)
     else:
         logging.error('Either the world ended or we are not connected to the net.')
-
+    
     # Store results in pickle file
     store_results(pickle_file, pickledata)
 
