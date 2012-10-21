@@ -85,7 +85,7 @@ def compare_site_status(prev_results, alerter):
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
     statusGoogle, urlfileGoogle = get_site_status('http://www.google.com')
-    statusYahoo, urlfileYahoo = get_site_status('http://www.google.com')
+    statusYahoo, urlfileYahoo = get_site_status('http://www.yahoo.com')
     if statusGoogle == 'down' and statusYahoo == 'down':
         return False
     return True
