@@ -63,8 +63,10 @@ def compare_site_status(prev_results, alerter):
         elapsedTime = endTime - startTime
         msg = "%s took %s" % (url,elapsedTime)
         logging.info(msg)
-
-        friendly_status = '%s is %s' % (url, status)
+        
+        if status != "up": elapsedTime = -1
+        
+        friendly_status = '%s is %s. Response time: %s' % (url, status, elapsedTime)
         print friendly_status
         if url in prev_results and prev_results[url]['status'] != status:
             logging.warning(status)
@@ -85,7 +87,7 @@ def compare_site_status(prev_results, alerter):
 def is_internet_reachable():
     '''Checks Google then Yahoo just in case one is down'''
     statusGoogle, urlfileGoogle = get_site_status('http://www.google.com')
-    statusYahoo, urlfileYahoo = get_site_status('http://www.google.com')
+    statusYahoo, urlfileYahoo = get_site_status('http://www.yahoo.com')
     if statusGoogle == 'down' and statusYahoo == 'down':
         return False
     return True
