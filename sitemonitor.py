@@ -6,7 +6,7 @@ import pickle, os, logging, time, urllib2, re
 from optparse import OptionParser, OptionValueError
 from smtplib import SMTP
 from getpass import getuser
-from socket import gethostname
+from socket import gethostname, setdefaulttimeout
 
 
 def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
@@ -147,6 +147,9 @@ def get_command_line_options():
     parser.add_option("-r", "--alert-on-slow-response", action="store_true",
             help="Turn on alerts for response times")
 
+    parser.add_option("--timeout", dest="timeout", type="float",
+            help="Set the timeout amount (in seconds).")
+
     parser.add_option("-g", "--use-gmail", action="store_true", dest="use_gmail",
             help="Send email with Gmail.  Must also specify username and password")
 
@@ -219,6 +222,9 @@ def main():
                           use_gmail=options.use_gmail,
                           username=options.smtp_username, password=options.smtp_password,
                           hostname=options.smtp_hostname, port=options.smtp_port)
+
+    # Set timeout
+    setdefaulttimeout(options.timeout)
 
     # Check sites only if Internet is_available
     if is_internet_reachable():
