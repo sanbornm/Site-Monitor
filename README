@@ -6,6 +6,7 @@ Options:
                         Turn on logging for response times
   -r, --alert-on-slow-response
                         Turn on alerts for response times
+  --timeout=TIMEOUT     Set the timeout amount (in seconds).
   -g, --use-gmail       Send email with Gmail.  Must also specify username and
                         password
   --smtp-hostname=SMTP_HOSTNAME
