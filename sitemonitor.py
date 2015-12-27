@@ -2,11 +2,20 @@
 
 # sample usage: checksites.py eriwen.com nixtutor.com yoursite.org
 
-import pickle, os, logging, time, urllib2, re
+import pickle
+import os
+import logging
+import time
+import re
 from optparse import OptionParser, OptionValueError
 from smtplib import SMTP
 from getpass import getuser
 from socket import gethostname, setdefaulttimeout
+
+try:
+    from urllib2 import urlopen
+except ImportError:
+    from urllib.request import urlopen
 
 
 def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
@@ -26,7 +35,8 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
             server = SMTP(hostname, port)
         else:
             server = SMTP()
-        server.connect()
+        # server.connect()
+        server.starttls()
 
     if username and password:
         server.login(username, password)
@@ -39,7 +49,7 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
 
 def get_site_status(url):
     try:
-        urlfile = urllib2.urlopen(url)
+        urlfile = urlopen(url)
         status_code = urlfile.code
         if status_code in (200, 302):
             return 'up', urlfile
@@ -51,7 +61,7 @@ def get_site_status(url):
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
     try:
-        return urllib2.urlopen(url).info().headers
+        return urlopen(url).info().as_string()
     except:
         return 'Headers unavailable'
 
@@ -70,14 +80,16 @@ def compare_site_status(prev_results, alerter):
         if status != "up":
             elapsedTime = -1
 
-        friendly_status = '%s is %s. Response time: %s' % (url, status, elapsedTime)
-        print friendly_status
+        friendly_status = '%s is %s. Response time: %s' % (
+            url, status, elapsedTime)
+        print(friendly_status)
         if url in prev_results and prev_results[url]['status'] != status:
             logging.warning(status)
             # Email status messages
             alerter(str(get_headers(url)), friendly_status)
 
-        # Create dictionary for url if one doesn't exist (first time url was checked)
+        # Create dictionary for url if one doesn't exist (first time url was
+        # checked)
         if url not in prev_results:
             prev_results[url] = {}
 
@@ -184,11 +196,11 @@ def main():
 
     # Print out usage if no arguments are present
     if len(args) == 0 and options.from_file is None:
-        print 'Usage:'
-        print "\tPlease specify a url like: www.google.com"
-        print "\tNote: The http:// is not necessary"
-        print 'More Help:'
-        print "\tFor more help use the --help flag"
+        print('Usage:')
+        print("\tPlease specify a url like: www.google.com")
+        print("\tNote: The http:// is not necessary")
+        print('More Help:')
+        print("\tFor more help use the --help flag")
 
     # If the -f flag is set we get urls from a file, otherwise we get them from the command line.
     if options.from_file:
@@ -229,7 +241,7 @@ def main():
     # Check sites only if Internet is_available
     if is_internet_reachable():
         status_checker = compare_site_status(pickledata, alerter)
-        map(status_checker, urls)
+        list(map(status_checker, urls))
     else:
         logging.error('Either the world ended or we are not connected to the net.')
 
