@@ -49,7 +49,7 @@ def generate_email_alerter(to_addrs, from_addr=None, use_gmail=False,
 
 def get_site_status(url):
     try:
-        urlfile = urllib2.urlopen(url)
+        urlfile = urlopen(url)
         status_code = urlfile.code
         if status_code in (200, 302):
             return 'up', urlfile
@@ -61,7 +61,7 @@ def get_site_status(url):
 def get_headers(url):
     '''Gets all headers from URL request and returns'''
     try:
-        return urllib2.urlopen(url).info().as_string()
+        return urlopen(url).info().as_string()
     except:
         return 'Headers unavailable'
 
